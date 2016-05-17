@@ -18,12 +18,15 @@ markdownpage: true
 
 ---
 
-Options are added in key-value pairs and passed as an argument to `PhotoSwipe` contructor, e.g.:
+Options are added in key-value pairs and passed as an argument to `PhotoSwipe` constructor, e.g.:
 
 ```javascript
 var options = {
 	index: 3,
-	escKey: false
+	escKey: false,
+
+	// ui option
+	timeToIdle: 4000
 };
 var gallery = new PhotoSwipe( someElement, PhotoSwipeUI_Default, someItems, options);
 gallery.init();
@@ -42,15 +45,17 @@ gallery.options.escKey = false;
 
 ### `index` <code class="default">integer</code> <code class="default">0</code>
 
-Start slide index. `0` is the first slide.
+Start slide index. `0` is the first slide. Must be integer, not a string.
 
 ### `getThumbBoundsFn` <code class="default">function</code> <code class="default">undefined</code>
 
-Function should return object with coordinates from which initial zoom-in animation will start (or zoom-out animation will end). 
+Function should return an object with coordinates from which initial zoom-in animation will start (or zoom-out animation will end). 
 
-Object should contain three properties: `x` (X position, relative to document), `y` (Y position, relative to document), `w` (width of element). Height will be calculated automatically based on size of large image. For example if you return `{x:0,y:0,w:50}` zoom animation will start in top left corner of your page.
+Object should contain three properties: `x` (X position, relative to document), `y` (Y position, relative to document), `w` (width of the element). Height will be calculated automatically based on size of large image. For example if you return `{x:0,y:0,w:50}` zoom animation will start in top left corner of your page.
 
-Function has one argument - `index` of item that is opening or closing.
+Function has one argument - `index` of the item that is opening or closing.
+
+In non-modal mode, the template's position relative to the viewport should be subtracted from `x` and `y`. Look at [the FAQ](faq.html#inline-gallery) for more information.
 
 Example that calculates position of thumbnail: 
 
@@ -68,7 +73,7 @@ getThumbBoundsFn: function(index) {
 	var rect = thumbnail.getBoundingClientRect(); 
 	
 	// w = width
-	return {x:rect.left, y:rect.top + pageYScroll, w:rect.height};
+	return {x:rect.left, y:rect.top + pageYScroll, w:rect.width};
 
 
 	// Good guide on how to get element coordinates:
@@ -76,10 +81,17 @@ getThumbBoundsFn: function(index) {
 }
 ```
 
-If dimensions of your small thumbnail don't match dimensions of large image, consider enabling zoom+fade transition. You can do this by adding option `showHideOpacity:true` (try adding it to [above CodePen](http://codepen.io/dimsemenov/pen/NPGOob/) to test how it looks). Or disable transition entirely by adding `hideAnimationDuration:0, showAnimationDuration:0`. [More info about this in FAQ](faq.html#different-thumbnail-dimensions).
+If dimensions of your small thumbnail don't match dimensions of large image, consider enabling zoom+fade transition. You can do this by adding option `showHideOpacity:true` (try adding it to [above CodePen](http://codepen.io/dimsemenov/pen/ZYbPJM) to test how it looks). Or disable transition entirely by adding `hideAnimationDuration:0, showAnimationDuration:0`. [More info about this in FAQ](faq.html#different-thumbnail-dimensions).
 
-If you want to "hide" small thumbnail during the animation use `opacity:0`, not `visibility:hidden` or `display:none`. Don't force Paint and Layout at the beginning of animation to avoid lag.
+If you want to "hide" small thumbnail during the animation use `opacity:0`, not `visibility:hidden` or `display:none`. Don't force Paint and Layout at the beginning of the animation to avoid lag.
 
+
+### `showHideOpacity` <code class="default">boolean</code> <code class="default">false</code>
+
+If set to `false`: background `opacity` and image `scale` will be animated (image opacity is always 1). 
+If set to `true`: root PhotoSwipe element `opacity` and image `scale` will be animated.
+
+To enable just `opacity` transition (without `scale`), do not define `getThumbBoundsFn` option.
 
 ### `showAnimationDuration` <code class="default">integer</code> <code class="default">333</code>
 
@@ -103,13 +115,7 @@ If you're using Sass, you just need to change transition-duration variables in [
 
 ### `hideAnimationDuration` <code class="default">integer</code> <code class="default">333</code>
 
-The same as previous option, just for closing (zoom-out) transition. After PhotoSwipe is opened `pswp--open` class will be added to root element, you may use it to apply different transition duration in CSS.
-
-
-### `showHideOpacity` <code class="default">boolean</code> <code class="default">false</code>
-
-If set to `false` background `opacity` and image `scale` will be animated (image opacity is always 1). 
-If set to `true` root PhotoSwipe element `opacity` and image `scale` will be animated. Enable it when dimensions of your small thumbnail don't match dimensions of large image 
+The same as the previous option, just for closing (zoom-out) transition. After PhotoSwipe is opened `pswp--open` class will be added to the root element, you may use it to apply different transition duration in CSS.
 
 
 ### `bgOpacity` <code class="default">number</code> <code class="default">1</code>
@@ -221,6 +227,34 @@ If set to `false` disables history module (back button to close gallery, unique 
 Gallery unique ID. Used by History module when forming URL. For example, second picture of gallery with UID 1 will have URL: `http://example.com/#&gid=1&pid=2`.
 
 
+### <a name="galleryPIDs"></a> `galleryPIDs` <code class="default">boolean</code> <code class="default">false</code>
+
+Enables custom IDs for each slide object that are used when forming URL. If option set set to `true`, slide objects must have `pid` (picture identifier) property that can be a string or an integer. For example:
+
+```js
+var slides = [
+	{
+		src: 'path/to/1.jpg',
+		w:500,
+		h:400,
+		pid: 'image-one'
+	},
+	{
+		src: 'path/to/2.jpg',
+		w:300,
+		h:700,
+		pid: 'image-two'
+	},
+
+	... 
+];
+```
+
+... second slide will have URL `http://example.com/#&gid=1&pid=image-two`.
+
+Read more about how to implement custom PID in [the FAQ section](faq.html#custom-pid-in-url).
+
+
 ### `errorMsg` <code class="default">string</code>
 
 Error message when image was not loaded. `%url%` will be replaced by URL of image.
@@ -262,12 +296,13 @@ isClickableElement: function(el) {
 
 Function should check if the element (`el`) is clickable. If it is &ndash; PhotoSwipe will not call `preventDefault` and `click` event will pass through. Function should be as light is possible, as it's executed multiple times on drag start and drag release.
 
+### `modal` <code class="default">boolean</code> <code class="default">true</code>
 
-
+Controls whether PhotoSwipe should expand to take up the entire viewport. If false, the PhotoSwipe element will take the size of the positioned parent of the template. Take a look at [the FAQ](faq.html#inline-gallery) for more information.
 
 ## Default UI Options
 
-Options of `PhotoSwipeUI_Default` (`dist/ui/photoswipe-ui-default.js`).
+Options for `PhotoSwipeUI_Default` (`dist/ui/photoswipe-ui-default.js`) are added the same way and to the same object as core options.
 
 ```javascript
 // Size of top & bottom bars in pixels,
@@ -277,13 +312,6 @@ Options of `PhotoSwipeUI_Default` (`dist/ui/photoswipe-ui-default.js`).
 // 
 // (Also refer to `parseVerticalMargin` event)
 barsSize: {top:44, bottom:'auto'}, 
-
-// Element classes click on which should close the PhotoSwipe.
-// In HTML markup, class should always start with "pswp__", e.g.: "pswp__item", "pswp__caption".
-// 
-// "pswp__ui--over-close" class will be added to root element of UI when mouse is over one of these elements
-// By default it's used to highlight the close button.
-closeElClasses: ['item', 'caption', 'zoom-wrap', 'ui', 'top-bar'], 
 
 // Adds class pswp__ui--idle to pswp__ui element when mouse isn't moving for 4000ms
 timeToIdle: 4000,
@@ -325,10 +353,22 @@ tapToClose: false,
 // Tap should toggle visibility of controls
 tapToToggleControls: true,
 
+// Mouse click on image should close the gallery,
+// only when image is smaller than size of the viewport
+clickToCloseNonZoomable: true,
+
+// Element classes click on which should close the PhotoSwipe.
+// In HTML markup, class should always start with "pswp__", e.g.: "pswp__item", "pswp__caption".
+// 
+// "pswp__ui--over-close" class will be added to root element of UI when mouse is over one of these elements
+// By default it's used to highlight the close button.
+closeElClasses: ['item', 'caption', 'zoom-wrap', 'ui', 'top-bar'], 
+
 // Separator for "1 of X" counter
 indexIndicatorSep: ' / ',
 
 
+{% raw %}
 // Share buttons
 // 
 // Available variables for URL:
@@ -342,6 +382,7 @@ shareButtons: [
 	{id:'pinterest', label:'Pin it', url:'http://www.pinterest.com/pin/create/button/?url={{url}}&media={{image_url}}&description={{text}}'},
 	{id:'download', label:'Download image', url:'{{raw_image_url}}', download:true}
 ],
+{% endraw %}
 
 // Next 3 functions return data for share links
 // 
@@ -370,7 +411,7 @@ parseShareButtonOut: function(shareButtonData, shareButtonOut) {
 }
 ```
 
-Know how this page can be improved? Found typo? [Suggest an edit!](https://github.com/dimsemenov/PhotoSwipe/blob/master/website/documentation/responsive-images.md)
+Know how this page can be improved? Found a typo? [Suggest an edit!](https://github.com/dimsemenov/PhotoSwipe/blob/master/website/documentation/responsive-images.md)
 
 <iframe src="http://ghbtns.com/github-btn.html?user=dimsemenov&amp;repo=photoswipe&amp;type=watch&amp;count=true&amp;size=large" allowtransparency="true" frameborder="0" scrolling="0" width="155" height="30" style=""></iframe>
 
